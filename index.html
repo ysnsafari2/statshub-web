@@ -1,0 +1,193 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Statshub</title>
+<link href="https://fonts.googleapis.com/css2?family=Poppins:wght@500;600;700;800&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+:root{
+  --purple1:#5B2EBD; --purple2:#8B5CF6; --yellow:#FFC940; --olive:#3F4023;
+  --navy:#131B33; --ink:#20232B; --muted:#6E7480; --pill:#CBD5DE; --pillL:#E7ECF1;
+  --bg:#F6F7FA; --card:#FFFFFF; --line:#E3E6EC;
+}
+*{box-sizing:border-box;}
+html,body{height:100%;}
+body{margin:0; background:var(--bg); color:var(--ink); font-family:'Inter',system-ui,sans-serif;}
+#app{max-width:480px; margin:0 auto; min-height:100%; display:flex; flex-direction:column;}
+header{padding:20px 20px 14px; display:flex; align-items:center; justify-content:space-between;}
+.brand{display:flex; align-items:center; gap:10px;}
+.brand .logos{font-size:26px;}
+.brand h1{font-family:'Poppins'; font-size:19px; margin:0; font-weight:700;}
+.brand p{margin:0; font-size:11.5px; color:var(--muted);}
+main{flex:1; padding:0 20px 100px;}
+.hero{border-radius:20px; padding:26px 22px; margin-bottom:22px; color:#fff;
+  background:linear-gradient(135deg, var(--purple1), var(--purple2) 70%, #3a2a7a);}
+.hero h2{font-family:'Poppins'; font-size:26px; margin:0 0 8px; font-weight:800;}
+.hero p{margin:0; font-size:14px; line-height:1.5; opacity:.92; max-width:80%;}
+.grid{display:grid; grid-template-columns:1fr 1fr; gap:14px;}
+.tile{background:var(--card); border:1px solid var(--line); border-radius:16px; padding:22px 14px 16px; text-align:center; cursor:pointer;}
+.tile .emoji{font-size:38px; display:block; margin-bottom:10px;}
+.tile span{font-family:'Poppins'; font-weight:700; font-size:15px;}
+.crumb{font-family:'Poppins'; font-weight:700; color:#fff; background:var(--olive); border-radius:12px; padding:14px 18px; margin-bottom:16px; font-size:17px;}
+.pill{background:var(--pill); border-radius:24px; padding:15px 20px; margin-bottom:12px; display:flex; align-items:center; justify-content:space-between; font-family:'Poppins'; font-weight:700; font-size:15px; cursor:pointer;}
+.sub{background:var(--olive); color:#fff; border-radius:10px; padding:13px 18px; margin:-4px 0 10px; font-size:14px; cursor:pointer;}
+.sub.selected{text-decoration:underline;}
+.playerlist{display:grid; grid-template-columns:1fr 1fr; gap:0 14px;}
+.playerlist div{padding:13px 10px; border-bottom:1px solid var(--line); font-size:14.5px; cursor:pointer;}
+table{width:100%; border-collapse:collapse; font-size:11.5px; margin-bottom:14px;}
+th{background:var(--navy); color:#fff; padding:7px 3px; font-family:'Poppins'; font-weight:600; font-size:10px;}
+td{padding:8px 3px; text-align:center; border-bottom:1px solid var(--line);}
+td:first-child,th:first-child{text-align:left; padding-left:8px;}
+tr:nth-child(even) td{background:rgba(0,0,0,.02);}
+.key{font-size:12px; color:var(--muted); line-height:1.9;}
+.key b{color:var(--ink);}
+.back{color:var(--purple1); font-weight:600; font-size:13px; margin-bottom:14px; cursor:pointer; display:inline-block;}
+.soon,.loading{text-align:center; padding:60px 10px; color:var(--muted);}
+.soon .e{font-size:44px; display:block; margin-bottom:14px;}
+nav.bottomnav{position:sticky; bottom:0; background:linear-gradient(135deg,var(--purple1),var(--purple2)); display:flex; padding:14px 10px;}
+nav.bottomnav .item{flex:1; text-align:center; color:#fff; font-size:11px; font-weight:600;}
+nav.bottomnav .item .ic{width:40px; height:32px; margin:0 auto 4px; display:flex; align-items:center; justify-content:center; border-radius:10px; font-size:16px;}
+nav.bottomnav .item.active .ic{background:var(--yellow); color:#20232B;}
+</style>
+</head>
+<body>
+<div id="app">
+  <header>
+    <div class="brand"><span class="logos">🏀⚽</span><div><h1>Statshub</h1><p>for teams and players stats</p></div></div>
+  </header>
+  <main id="screen"><div class="loading">Loading...</div></main>
+  <nav class="bottomnav">
+    <div class="item active"><div class="ic">🏠</div>Home</div>
+    <div class="item"><div class="ic">🔍</div>Search</div>
+    <div class="item"><div class="ic">⚙️</div>Settings</div>
+    <div class="item"><div class="ic">👤</div>Profile</div>
+  </nav>
+</div>
+<script>
+const SUPA_URL = "https://owajohfpdbamadwbpquc.supabase.co";
+const SUPA_KEY = "sb_publishable_nVE43GD0kaiUsr3mt3JpMw_aejdjDZf";
+
+async function supa(path){
+  try{
+    const res = await fetch(`${SUPA_URL}/rest/v1/${path}`, {
+      headers: { apikey: SUPA_KEY, Authorization: `Bearer ${SUPA_KEY}` }
+    });
+    if(!res.ok){ console.error("Supabase error on", path, await res.text()); return []; }
+    return await res.json();
+  }catch(e){ console.error(e); return []; }
+}
+
+function disp(v){ return (v===null||v===undefined) ? "-" : v; }
+function fmtDate(iso){ if(!iso) return "-"; const [y,m,d]=iso.split("-"); return `${d}-${m}-${y}`; }
+
+let state={screen:'home'};
+const root=document.getElementById('screen');
+function go(s){ state=Object.assign({},state,s); render(); }
+
+function tableHTML(headers,rowLabels,dataRows){
+  let h='<table><tr>'+headers.map(x=>`<th>${x}</th>`).join('')+'</tr>';
+  rowLabels.forEach((label,i)=>{
+    h+='<tr><td>'+label[0]+'<br><small style="color:var(--muted)">'+label[1]+'</small></td>'+dataRows[i].map(v=>`<td>${disp(v)}</td>`).join('')+'</tr>';
+  });
+  return h+'</table>';
+}
+
+async function render(){
+  let h='';
+  if(state.screen==='home'){
+    h+=`<div class="hero"><h2>Statshub</h2><p>a simple hub to track and showcase stats for teams and players.</p></div>
+    <div class="grid">
+      <div class="tile" onclick="go({screen:'football-teams'})"><span class="emoji">🛡️</span><span>Football Teams</span></div>
+      <div class="tile" onclick="go({screen:'soon'})"><span class="emoji">👕</span><span>Football Players</span></div>
+      <div class="tile" onclick="go({screen:'soon'})"><span class="emoji">🏀</span><span>Basketball Teams</span></div>
+      <div class="tile" onclick="go({screen:'soon'})"><span class="emoji">🎽</span><span>Basketball Players</span></div>
+    </div>`;
+    root.innerHTML=h; return;
+  }
+  if(state.screen==='soon'){
+    root.innerHTML=`<span class="back" onclick="go({screen:'home'})">← Back</span><div class="soon"><span class="e">🚧</span>Coming soon</div>`; return;
+  }
+
+  root.innerHTML='<div class="loading">Loading...</div>';
+
+  if(state.screen==='football-teams'){
+    const countries = await supa(`countries?select=id,name&order=id.asc`);
+    h+=`<span class="back" onclick="go({screen:'home'})">← Home</span>`;
+    for(const c of countries){
+      h+=`<div class="pill" onclick="go({screen:'football-teams',open:${c.id}})">${c.name} <span>⌄</span></div>`;
+      if(state.open===c.id){
+        const leagues = await supa(`leagues?select=id,name&country_id=eq.${c.id}&order=id.asc`);
+        if(leagues.length===0){ h+=`<div class="sub">Coming soon</div>`; }
+        for(const l of leagues){
+          h+=`<div class="sub" onclick="go({screen:'league',leagueId:${l.id},leagueName:'${l.name}'})">${l.name}</div>`;
+        }
+      }
+    }
+  } else if(state.screen==='league'){
+    const teams = await supa(`teams?select=id,name&league_id=eq.${state.leagueId}&order=id.asc`);
+    h+=`<span class="back" onclick="go({screen:'football-teams',open:${state.countryId||1}})">← Back</span>
+    <div class="crumb">${state.leagueName}</div>`;
+    for(const t of teams){
+      h+=`<div class="pill" onclick="go({screen:'league',leagueId:state.leagueId,leagueName:state.leagueName,openTeam:${t.id}})">${t.name} <span>⌄</span></div>`;
+      if(state.openTeam===t.id){
+        h+=`<div class="sub" onclick="go({screen:'team-stats',teamId:${t.id},teamName:'${t.name}'})">Team Stats</div>
+            <div class="sub" onclick="go({screen:'players-list',teamId:${t.id},teamName:'${t.name}'})">Players Stats</div>`;
+      }
+    }
+  } else if(state.screen==='team-stats'){
+    const matches = await supa(`matches?select=id,opponent,match_date&team_id=eq.${state.teamId}&order=match_date.desc&limit=20`);
+    const ids = matches.map(m=>m.id);
+    const stats = ids.length ? await supa(`team_stats?select=*&match_id=in.(${ids.join(',')})`) : [];
+    const byMatch = {}; stats.forEach(s=>byMatch[s.match_id]=s);
+
+    const rowLabels = matches.map(m=>[m.opponent, fmtDate(m.match_date)]);
+    const dataRows = matches.map(m=>{
+      const s = byMatch[m.id] || {};
+      return [s.goals,s.total_shots,s.shots_on_target,s.passes,s.corners,s.throw_ins,s.fouls,s.yellow_cards,s.red_cards,s.offsides,s.headed_goals,s.gk_saves,s.woodwork];
+    });
+
+    h+=`<span class="back" onclick="go({screen:'league',leagueId:state.leagueId,leagueName:state.leagueName,openTeam:state.teamId})">← Back</span>
+    <div class="crumb">${state.teamName} Stats</div>`;
+    if(matches.length===0){ h+=`<div class="soon"><span class="e">📭</span>No synced matches yet</div>`; }
+    else {
+      h+=tableHTML(["Opponent","G","TS","SOT","P","Cnr","TI","F","Y","R","Off","HG","GS","Wd"],rowLabels,dataRows)
+      +`<div class="key"><b>Key</b><br>G: Goals · TS: Total shots · SOT: Shots on target · P: Passes · Cnr: Corners · TI: Throw ins · F: Fouls · Y: Yellow · R: Red · Off: Offsides · HG: Headed goals · GS: GK saves · Wd: Woodwork</div>`;
+    }
+  } else if(state.screen==='players-list'){
+    const players = await supa(`players?select=id,name&team_id=eq.${state.teamId}&order=id.asc`);
+    const half = Math.ceil(players.length/2);
+    const left = players.slice(0,half), right = players.slice(half);
+    h+=`<span class="back" onclick="go({screen:'league',leagueId:state.leagueId,leagueName:state.leagueName,openTeam:state.teamId})">← ${state.teamName}</span>
+    <div class="crumb">${state.teamName} Players Stats</div>
+    <div class="playerlist">`
+    +left.map(p=>`<div onclick="go({screen:'player',playerId:${p.id},playerName:'${p.name}'})">${p.name}</div>`).join('')
+    +right.map(p=>`<div onclick="go({screen:'player',playerId:${p.id},playerName:'${p.name}'})">${p.name}</div>`).join('')
+    +`</div>`;
+  } else if(state.screen==='player'){
+    const matches = await supa(`matches?select=id,opponent,match_date&team_id=eq.${state.teamId}&order=match_date.desc&limit=20`);
+    const ids = matches.map(m=>m.id);
+    const pstats = ids.length ? await supa(`player_stats?select=*&player_id=eq.${state.playerId}&match_id=in.(${ids.join(',')})`) : [];
+    const byMatch = {}; pstats.forEach(s=>byMatch[s.match_id]=s);
+
+    const played = matches.filter(m=>byMatch[m.id]);
+    const rowLabels = played.map(m=>[m.opponent, fmtDate(m.match_date)]);
+    const dataRows = played.map(m=>{
+      const s = byMatch[m.id];
+      return [s.minutes,s.goals,s.assists,s.total_shots,s.shots_on_target,s.tackles,s.fouls,s.fouls_suffered,s.passes,s.yellow_cards,s.red_cards];
+    });
+
+    h+=`<span class="back" onclick="go({screen:'players-list',teamId:state.teamId,teamName:state.teamName,leagueId:state.leagueId,leagueName:state.leagueName})">← Players</span>
+    <div class="crumb">${state.playerName}</div>`;
+    if(played.length===0){ h+=`<div class="soon"><span class="e">📭</span>No synced stats yet for this player</div>`; }
+    else {
+      h+=tableHTML(["Opponent","Min","G","A","TS","SOT","Tkl","F","FS","P","Y","R"],rowLabels,dataRows)
+      +`<div class="key"><b>Key</b><br>Min: Minutes · G: Goals · A: Assists · TS: Total shots · SOT: Shots on target · Tkl: Tackles · F: Fouls · FS: Fouls suffered · P: Passes · Y: Yellow · R: Red</div>`;
+    }
+  }
+  root.innerHTML=h;
+}
+render();
+</script>
+</body>
+</html>
